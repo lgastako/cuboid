@@ -1,0 +1,42 @@
+name:                "cuboid"
+version:             "0.1.0.0"
+github:              "lgastako/cuboid"
+license:             "BSD3"
+author:              "John Evans"
+maintainer:          "lgastako@gmail.com"
+copyright:           "2022 John Evans"
+
+extra-source-files:
+- README.md
+- ChangeLog.md
+
+synopsis:            Cuboids of homogeneous data.
+category:            Data Structures
+
+description:         README at <https://github.com/lgastako/cuboid#readme>
+
+dependencies:
+- base >= 4.7 && < 5
+- finite-typelits
+- lens
+- sliceofpy
+- protolude
+- vector
+- vector-sized
+
+library:
+  source-dirs: src
+
+tests:
+  cuboid-test:
+    main:                Driver.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - cuboid
+    - tasty
+    - tasty-discover
+    - tasty-hspec
