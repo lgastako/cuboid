@@ -44,7 +44,7 @@ spec_Point =
       toList po `shouldBe` "X"
 
 spec_Line :: Spec
-spec_Line = do
+spec_Line =
   context "given a line of 3 X's" $ do
     let li = pure 'X' :: Line 3 Char
 
@@ -205,12 +205,12 @@ spec_Rect =  do
 
       it "should be able to operate on columns" $
          (sqx & DC.col 1 . each %~ C.toLower)
-           `shouldBe` (DC.unsafeFromList
+           `shouldBe` DC.unsafeFromList
              [ "AbCD"
              , "EfGH"
              , "IjKL"
              , "MnOP"
-             ])
+             ]
 
       it "should be able to operate on rows" $
          (sqx & DC.row 1 . each %~ C.toLower)
@@ -288,3 +288,4 @@ spec_Square =
 
 truth :: Applicative f => f Bool
 truth = pure True
+
