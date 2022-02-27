@@ -32,7 +32,8 @@ library
       Data.Cuboid.Render
       Data.Vector.Sized.X
   other-modules:
-      Paths_cuboid
+      Data.Cuboid.Table
+      Data.Cuboid.Widths
   hs-source-dirs:
       src
   build-depends:
@@ -41,6 +42,7 @@ library
     , lens
     , protolude
     , sliceofpy
+    , split
     , text
     , vector
     , vector-sized
@@ -62,6 +64,7 @@ test-suite cuboid-test
     , lens
     , protolude
     , sliceofpy
+    , split
     , tasty
     , tasty-discover
     , tasty-hspec

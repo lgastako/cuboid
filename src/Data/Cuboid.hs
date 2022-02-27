@@ -18,14 +18,19 @@ module Data.Cuboid
   , module Data.Functor
   , module Data.Traversable
   , module Data.Slice.Lens
+  , Cube
+  , Cuboid
   , Line
+  , Nil
   , Point
   , Rect
   , Square
   -- Constructors
   , empty
-  , emptyCols
-  , emptyRows
+  , emptyX
+  , emptyY
+  , emptyZ
+  , enumFrom
   , fromList
   , fromSizedVectors
   -- Optics
@@ -33,29 +38,32 @@ module Data.Cuboid
   , col
   , row
   , slice
-  , sliceC
-  , sliceR
+  , sliceX
+  , sliceY
+  , sliceZ
   , transposed
   -- Combinators
   , (<+>)
-  , (<//>)
+  , (</>)
   , transpose
   , zipWith
   , zip
   -- Eliminators
   , toLists
   , toTexts
-  , unRect
+  , unCuboid
   , unsafeFromList
   ) where
 
 import Data.Cuboid.Prelude hiding ( empty
+                                  , enumFrom
                                   , transpose
                                   , zip
                                   , zipWith
                                   )
 
 import Data.Cuboid.Render         ( Render( render ) )
+import Data.List.Split            ( chunksOf )
 import Data.Vector.Sized.X        ( (!!)
                                   , (//)
                                   )
@@ -69,256 +77,405 @@ import qualified Data.Foldable
 import qualified Data.Functor
 import qualified Data.Traversable
 
+import qualified Data.Cuboid.Table   as Table
 import qualified Data.List           as L
+import qualified Data.Text           as T
 import qualified Data.Vector.Sized.X as SV
 
-type Square (n :: Nat) = Rect n n
-
-type Point = Rect 1 1
-
-type Line (n :: Nat) = Rect n 1
-
--- TODO: Extend Rect to Cuboid with z ... and rename r c to y x?
-newtype Rect (r :: Nat) (c :: Nat) a = Rect
-  (SV.Vector c (SV.Vector r a))
+newtype Cuboid (z :: Nat) (y :: Nat) (x :: Nat) a = Cuboid
+  (SV.Vector z (SV.Vector y (SV.Vector x a)))
   deriving (Eq, Foldable, Functor, Generic, Ord, Show, Traversable)
 
-instance (KnownNat r, KnownNat c) => Applicative (Rect r c) where
-  pure = Rect . pure . pure
-  Rect f <*> Rect x = Rect $ SV.zipWith (SV.zipWith ($)) f x
+type Cube n   = Cuboid n n n
+type Nil      = Cuboid 0 0 0
+type Line     = Rect 1
+type Point    = Line 1
+type Rect     = Cuboid 1
+type Square n = Rect n n
 
-instance Each (Square n a) (Square n b) a b
+instance ( KnownNat z
+         , KnownNat y
+         , KnownNat x
+         )
+    => Applicative (Cuboid z y x) where
+  pure x = Cuboid (pure (pure (pure x)))
+
+  Cuboid f <*> Cuboid x = Cuboid
+    $ SV.zipWith
+       (SV.zipWith
+          (SV.zipWith ($))) f x
+
+instance Each (Cuboid z y x a) (Cuboid z y x b) a b
+
+instance Render a => Render (Cuboid z y x a) where
+  render = toTexts >>> map renderAisle >>> T.intercalate "\n"
+    where
+      renderAisle :: [[Text]] -> Text
+      renderAisle = map Table.Row
+                >>> Table.fromRows
+                >>> Table.render
 
 -- ================================================================ --
 --   Constructors
 -- ================================================================ --
 
-empty :: Rect 0 0 a
-empty = Rect SV.empty
+empty :: Cuboid 0 0 0 a
+empty = Cuboid SV.empty
 
-emptyCols :: KnownNat n => Rect 0 n a
-emptyCols = Rect $ pure SV.empty
+emptyZ :: Cuboid 0 y x a
+emptyZ = Cuboid SV.empty
 
-emptyRows :: Rect n 0 a
-emptyRows = Rect SV.empty
+emptyY :: KnownNat z => Cuboid z 0 x a
+emptyY = Cuboid . pure $ SV.empty
 
-fromList :: forall r c a.
-            ( KnownNat r
-            , KnownNat c
+emptyX :: (KnownNat z, KnownNat y) => Cuboid z y 0 a
+emptyX = Cuboid . pure . pure $ SV.empty
+
+fromList :: forall z y x a.
+            ( KnownNat z
+            , KnownNat y
+            , KnownNat x
             )
-         => [[a]]
-         -> Maybe (Rect r c a)
+         => [[[a]]]
+         -> Maybe (Cuboid z y x a)
 fromList xs
   | nSizes == 1 = Just $ unsafeFromList xs
   | otherwise   = Nothing
   where
     nSizes = length . L.nub . map length $ xs
 
-unsafeFromList :: forall r c a.
-                  ( KnownNat r
-                  , KnownNat c
+enumFrom :: forall z y x k.
+            ( Enum k
+            , KnownNat z
+            , KnownNat y
+            , KnownNat x
+            )
+         => k
+         -> Cuboid z y x k
+enumFrom k = [k..]
+  |> ( chunksOf x
+   >>> chunksOf y
+   >>> take z
+   >>> unsafeFromList
+     )
+  where
+    x = extractInt (Proxy @x)
+    y = extractInt (Proxy @y)
+    z = extractInt (Proxy @z)
+
+unsafeFromList :: forall z y x a.
+                  ( KnownNat z
+                  , KnownNat y
+                  , KnownNat x
                   )
-               => [[a]]
-               -> Rect r c a
-unsafeFromList = map SV.unsafeFromList
+               => [[[a]]]
+               -> Cuboid z y x a
+unsafeFromList = (map . map) SV.unsafeFromList
+             >>> map SV.unsafeFromList
              >>> SV.unsafeFromList
              >>> SV.transpose
-             >>> Rect
+             >>> fromSizedVectors
 
-fromSizedVectors :: SV.Vector c (SV.Vector r a) -> Rect r c a
-fromSizedVectors = Rect
+fromSizedVectors :: forall z y x a.
+                    SV.Vector z (SV.Vector y (SV.Vector x a))
+                 -> Cuboid z y x a
+fromSizedVectors = Cuboid
 
 -- ================================================================ --
 --   Optics
 -- ================================================================ --
 
-at :: forall r c a.
-      ( KnownNat r
-      , KnownNat c
+at :: forall z y x a.
+      ( KnownNat z
+      , KnownNat y
+      , KnownNat x
       )
-   => ( Finite r
-      , Finite c
+   => ( Finite z
+      , Finite y
+      , Finite x
       )
-   -> Lens' (Rect r c a) a
-at (r, c) = lens
-  (\(Rect v) -> (v !! c) !! r)
-  (\(Rect v) x -> Rect $ v // [(c, v !! c // [(r, x)])])
+   -> Lens' (Cuboid z y x a) a
+at (z, y, x) = lens
+  (\(Cuboid v) -> ((v !! z) !! y) !! x)
+  (\(Cuboid v) x' -> Cuboid
+    $ v //
+        [(z, v !! z //
+                    [(y, (v !! z) !! y
+                       //
+                       [(x, x')])])])
 
-col :: forall r c a.
-       Finite c
-    -> Lens' (Rect r c a)
-             (SV.Vector r a)
-col c = lens (\(Rect v) -> v SV.!! c) $ \(Rect v) v' -> Rect
-  . SV.update v
-  . SV.singleton
-  $ ( fromIntegral . getFinite $ c
-    , v'
-    )
+col :: forall y x a.
+       Finite y
+    -> Lens' (Rect y x a)
+             (SV.Vector x a)
+col c = lens
+  (\(Cuboid v) -> (v !! 0) !! c)
+  (\(Cuboid aisles) col' -> Cuboid $ aisles //
+    [(0, (aisles !! 0) // [(c, col')])])
 
-row :: forall r c a.
-       ( KnownNat r
-       , KnownNat c
+row :: forall y x a.
+       ( KnownNat y
+       , KnownNat x
        )
-    => Finite r
-    -> Lens' (Rect r c a)
-             (SV.Vector c a)
-row r = transposed . col r
+    => ( Finite x )
+    -> Lens' (Rect y x a)
+             (SV.Vector y a)
+row c = transposed . col c
 
-sliceC :: forall c' r c x m a p.
-          ( KnownNat c'
-          , KnownNat x
-          , c ~ ((x + c') + m)
+sliceZ :: forall z' z y x m p q a.
+          ( KnownNat q
+          , KnownNat z'
+          , z ~ ((q + z') + m)
           )
-       => p x
-       -> Rect r c  a
-       -> Rect r c' a
-sliceC px (Rect v) = Rect $ SV.slice px v
+       => p q
+       -> Cuboid z  y x a
+       -> Cuboid z' y x a
+sliceZ = over . SV.slice
 
-sliceR :: forall r' r c y m a p.
-          ( KnownNat r'
-          , KnownNat y
-          , r ~ ((y + r') + m)
+sliceY :: forall y' z y x m p q a.
+          ( KnownNat y'
+          , KnownNat q
+          , y ~ ((q + y') + m)
           )
-       => p y
-       -> Rect r  c a
-       -> Rect r' c a
-sliceR py (Rect v) = Rect $ SV.map (SV.slice py) v
+       => p q
+       -> Cuboid z y  x a
+       -> Cuboid z y' x a
+sliceY pq = over $ SV.map (SV.slice pq)
 
-slice :: forall x y r' c' r c m n a.
-         ( KnownNat r'
-         , KnownNat c'
-         , KnownNat c
-         , KnownNat x
-         , KnownNat y
-         , r ~ ((x + r') + m)
-         , c ~ ((y + c') + n)
+sliceX :: forall x' z y x m p q a.
+          ( KnownNat q
+          , KnownNat x'
+          , x ~ ((q + x') + m)
+          )
+       => p q
+       -> Cuboid z y x  a
+       -> Cuboid z y x' a
+sliceX pq = over $ SV.map (SV.map (SV.slice pq))
+
+slice :: forall z'
+                y' x' z_ y_ x_ z y x m n o p b.
+         ( KnownNat z'
+         , KnownNat z_
+         , KnownNat y'
+         , KnownNat y_
+         , KnownNat x_
+         , KnownNat x'
+         , z ~ ((z_ + z') + m)
+         , y ~ ((y_ + y') + n)
+         , x ~ ((x_ + x') + o)
          )
-      => (Proxy x, Proxy y)
-      -> Lens' (Rect r c a)
-               (Rect r' c' a)
-slice (rp, cp) = lens (sliceC cp . sliceR rp) set'
+      => ( p z_
+         , p y_
+         , p x_
+         )
+      -> Lens' (Cuboid z  y  x  b)
+               (Cuboid z' y' x' b)
+slice (z, y, x) = lens (sliceZ z . sliceY y . sliceX x) set'
   where
-    set' :: Rect r c a
-         -> Rect r' c' a
-         -> Rect r c a
-    set' (Rect v) (Rect v') = Rect v''
+    set' :: Cuboid z  y  x  b
+         -> Cuboid z' y' x' b
+         -> Cuboid z  y  x  b
+    set' (Cuboid aisles) (Cuboid aisles') = Cuboid aisles''
       where
-        _ = v  :: SV.Vector c  (SV.Vector r  a)
-        _ = v' :: SV.Vector c' (SV.Vector r' a)
-
-        v'' :: SV.Vector c (SV.Vector r a)
-        v'' = SV.update v updates
+        aisles'' :: SV.Vector z (SV.Vector y (SV.Vector x b))
+        aisles'' = SV.update aisles updates
           where
-            updates :: SV.Vector c' (Int, SV.Vector r a)
-            updates = SV.zipWith f indexes v'
+            updates :: SV.Vector z' (Int, SV.Vector y (SV.Vector x b))
+            updates = SV.zipWith f indexVec aisles'
               where
+                indexVec = SV.unsafeFromList indexes
+
+                indexes :: [Int]
+                indexes = [start'..stop']
+
+                start' :: Int
+                start' = z_i
+
+                stop' :: Int
+                stop'  = start' + z'i
+
+                z'i :: Int
+                z'i = extractInt (Proxy @z')
+
+                z_i :: Int
+                z_i = extractInt (Proxy @z_)
+
                 f :: Int
-                  -> SV.Vector r' a
-                  -> (Int, SV.Vector r a)
-                f ci vr = (ci, vv')
+                  -> (SV.Vector y' (SV.Vector x' b))
+                  -> (Int, SV.Vector y (SV.Vector x b))
+                f n _v' = (n, v'')
                   where
+                    v'' = SV.update something updates'
 
-                    vv :: SV.Vector r a
-                    vv = SV.index v ci'
+                    something :: SV.Vector y (SV.Vector x b)
+                    something = panic "aisles''.something"
 
-                    vv' :: SV.Vector r a
-                    vv' = SV.update vv updates'
-                      where
-                        updates' :: SV.Vector r' (Int, a)
-                        updates' = SV.zipWith (,) indexes' vr
+                    updates' :: SV.Vector rr (Int, a)
+                    updates' = panic "aisles''.updates"
 
-                        indexes' :: SV.Vector r' Int
-                        indexes' = SV.unsafeFromList [ start' .. stop' ]
-                          where
-                            start' = fromIntegral . natVal $ Proxy @x
-                            stop'  = fromIntegral . natVal $ Proxy @r'
+    -- set' = over f
+    --   where
+    --     f :: SV.Vector z y x b
+    --       -> SV.Vector z y x b
+    --     f = undefined
 
-                    ci' = case packFinite @c (fromIntegral ci) of
-                            Just x -> x
-                            Nothing -> panic "Failed when packing finite"
+-- slice :: forall sz sy sx z y x z' y' x'
+--                 r' c' r c m n
+--                 b.
+--          ( KnownNat sz
+--          , KnownNat sy
+--          , KnownNat sx
+--          , KnownNat z'
+--          , KnownNat y'
+--          , KnownNat x'
+--          , KnownNat z
+--          , KnownNat y
+--          , KnownNat x
+--          , x ~ ((sx + r') + m)
+--          , y ~ ((sy + c') + n)
+--          )
+--       => (Proxy sz, Proxy sy, Proxy sz)
+--       -> Lens' (Cuboid z  y  x  b)
+--                (Cuboid z' y' x' b)
+-- slice (cp, rp, ap) = lens (sliceA ap . sliceC cp . sliceR rp) set'
+--   where
+--     set' :: Cuboid c r a b
+--          -> Cuboid r' c' a' b
+--          -> Cuboid r c a a
+--     set' = panic "Cuboid.slice.set'"
 
-                indexes :: SV.Vector c' Int
-                indexes = SV.unsafeFromList [ start' .. stop' ]
-                  where
-                    start' = fromIntegral . natVal $ Proxy @y
-                    stop'  = fromIntegral . natVal $ Proxy @c'
+    -- set' (Cuboid v) (Cuboid v') = Cuboid v''
+    --   where
+    --     _ = v  :: SV.Vector c  (SV.Vector r  a)
+    --     _ = v' :: SV.Vector c' (SV.Vector r' a)
 
+    --     v'' :: SV.Vector c (SV.Vector r a)
+    --     v'' = SV.update v updates
+    --       where
+    --         updates :: SV.Vector c' (Int, SV.Vector r a)
+    --         updates = SV.zipWith f indexes v'
+    --           where
+    --             f :: Int
+    --               -> SV.Vector r' a
+    --               -> (Int, SV.Vector r a)
+    --             f ci vr = (ci, vv')
+    --               where
 
-transposed :: forall r c a.
-              ( KnownNat r
-              , KnownNat c
+    --                 vv :: SV.Vector r a
+    --                 vv = SV.index v ci'
+
+    --                 vv' :: SV.Vector r a
+    --                 vv' = SV.update vv updates'
+    --                   where
+    --                     updates' :: SV.Vector r' (Int, a)
+    --                     updates' = SV.zipWith (,) indexes' vr
+
+    --                     indexes' :: SV.Vector r' Int
+    --                     indexes' = SV.unsafeFromList [ start' .. stop' ]
+    --                       where
+    --                         start' = fromIntegral . natVal $ Proxy @sx
+    --                         stop'  = fromIntegral . natVal $ Proxy @r'
+
+    --                 ci' = case packFinite @c (fromIntegral ci) of
+    --                         Just x -> x
+    --                         Nothing -> panic "Failed when packing finite"
+
+    --             indexes :: SV.Vector c' Int
+    --             indexes = SV.unsafeFromList [ start' .. stop' ]
+    --               where
+    --                 start' = fromIntegral . natVal $ Proxy @sy
+    --                 stop'  = fromIntegral . natVal $ Proxy @c'
+
+transposed :: forall y x a.
+              ( KnownNat y
+              , KnownNat x
               )
-           => Iso' (Rect r c a)
-                   (Rect c r a)
+           => Iso' (Rect y x a)
+                   (Rect x y a)
 transposed = iso transpose transpose
 
 -- ================================================================ --
 --   Combinators
 -- ================================================================ --
 
-(<//>) :: forall r ca cb a cc.
-         ( KnownNat r
-         , KnownNat ca
-         , KnownNat cb
-         , KnownNat cc
-         , cc ~ (ca + cb)
-         )
-      => Rect r ca a
-      -> Rect r cb a
-      -> Rect r cc a
-a <//> b = transpose (transpose a <+> transpose b)
+(<+>) :: forall y xa xb xc a.
+         ( xc ~ (xa + xb) )
+      => Rect y xa a
+      -> Rect y xb a
+      -> Rect y xc a
+Cuboid a <+> Cuboid b = Cuboid
+  . SV.singleton
+  . SV.zipWith (SV.++) (a !! 0)
+  $ b !! 0
 
-(<+>) :: forall ra rb rc c a.
-         ( rc ~ (ra + rb) )
-      => Rect ra c a
-      -> Rect rb c a
-      -> Rect rc c a
-Rect a <+> Rect b = Rect $ SV.zipWith (SV.++) a b
+(</>) :: forall ya yb yc x a.
+         ( yc ~ (ya + yb) )
+      => Rect ya x a
+      -> Rect yb x a
+      -> Rect yc x a
+Cuboid a </> Cuboid b = Cuboid $ SV.zipWith (SV.++) a b
 
-transpose :: forall r c a.
-             ( KnownNat r
-             , KnownNat c
+transpose :: forall y x a.
+             ( KnownNat y
+             , KnownNat x
              )
-          => Rect r c a
-          -> Rect c r a
-transpose = unRect >>> SV.transpose >>> Rect
+          => Rect y x a
+          -> Rect x y a -- TODO Hrmmm
+transpose = over (SV.map SV.transpose)
 
-zipWith :: forall r c a b z.
-           ( KnownNat r
-           , KnownNat c
+over :: forall z' y' x' a' z y x a.
+         (  (SV.Vector z (SV.Vector y (SV.Vector x a)))
+         -> (SV.Vector z' (SV.Vector y' (SV.Vector x' a')))
+         )
+      -> Cuboid z  y  x  a
+      -> Cuboid z' y' x' a'
+over f (Cuboid v) = Cuboid (f v)
+
+zipWith :: forall z y x a b c.
+           ( KnownNat z
+           , KnownNat y
+           , KnownNat x
            )
-        => (a -> b -> z)
-        -> Rect r c a
-        -> Rect r c b
-        -> Rect r c z
+        => (a -> b -> c)
+        -> Cuboid z y x a
+        -> Cuboid z y x b
+        -> Cuboid z y x c
 zipWith f a b = f <$> a <*> b
 
-zip :: forall r c a b.
-       ( KnownNat r
-       , KnownNat c
+zip :: forall z y x a b.
+       ( KnownNat z
+       , KnownNat y
+       , KnownNat x
        )
-    => Rect r c a
-    -> Rect r c b
-    -> Rect r c (a, b)
+    => Cuboid z y x a
+    -> Cuboid z y x b
+    -> Cuboid z y x (a, b)
 zip = zipWith (,)
 
 -- ================================================================ --
 --   Eliminators
 -- ================================================================ --
 
-toLists :: forall r c a.
-           Rect r c a
-        -> [[a]]
-toLists = unRect
+toLists :: forall z y x a.
+           Cuboid z y x a
+        -> [[[a]]]
+toLists = unCuboid
+      >>> map (map SV.toList)
       >>> map SV.toList
       >>> SV.toList
 
-toTexts :: forall r c a.
+toTexts :: forall z y x a.
            Render a
-        => Rect r c a
-        -> [[Text]]
-toTexts = toLists
-      >>> map (map render)
+        => Cuboid z y x a
+        -> [[[Text]]]
+toTexts = toLists >>> (map . map . map) render
 
-unRect :: Rect r c a -> SV.Vector c (SV.Vector r a)
-unRect (Rect crv) = crv
+unCuboid :: Cuboid z y x a -> SV.Vector z (SV.Vector y (SV.Vector x a))
+unCuboid (Cuboid x) = x
+
+-- ================================================================ --
+--   Helpers
+-- ================================================================ --
+
+extractInt :: forall n. KnownNat n => Proxy n -> Int
+extractInt = fromIntegral . natVal

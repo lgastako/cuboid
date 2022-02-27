@@ -19,14 +19,18 @@ dependencies:
 - base >= 4.7 && < 5
 - finite-typelits
 - lens
-- sliceofpy
 - protolude
+- sliceofpy
+- split
 - text
 - vector
 - vector-sized
 
 library:
   source-dirs: src
+  other-modules:
+  - Data.Cuboid.Table
+  - Data.Cuboid.Widths
 
 tests:
   cuboid-test:
