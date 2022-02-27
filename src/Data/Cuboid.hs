@@ -228,20 +228,20 @@ slice (rp, cp) = lens (sliceC cp . sliceR rp) set'
                         updates' = SV.zipWith (,) indexes' vr
 
                         indexes' :: SV.Vector r' Int
-                        indexes' = SV.unsafeFromList [ start .. stop ]
+                        indexes' = SV.unsafeFromList [ start' .. stop' ]
                           where
-                            start = fromIntegral . natVal $ Proxy @x
-                            stop  = fromIntegral . natVal $ Proxy @r'
+                            start' = fromIntegral . natVal $ Proxy @x
+                            stop'  = fromIntegral . natVal $ Proxy @r'
 
                     ci' = case packFinite @c (fromIntegral ci) of
                             Just x -> x
                             Nothing -> panic "Failed when packing finite"
 
                 indexes :: SV.Vector c' Int
-                indexes = SV.unsafeFromList [ start .. stop ]
+                indexes = SV.unsafeFromList [ start' .. stop' ]
                   where
-                    start = fromIntegral . natVal $ Proxy @y
-                    stop  = fromIntegral . natVal $ Proxy @c'
+                    start' = fromIntegral . natVal $ Proxy @y
+                    stop'  = fromIntegral . natVal $ Proxy @c'
 
 
 transposed :: forall r c a.
