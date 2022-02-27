@@ -44,7 +44,7 @@ module Data.Cuboid
   , zip
   -- Eliminators
   , toLists
-  -- , toTexts
+  , toTexts
   , unRect
   , unsafeFromList
   ) where
@@ -55,15 +55,18 @@ import Data.Cuboid.Prelude hiding ( empty
                                   , zipWith
                                   )
 
--- import Data.Renderable            ( Renderable( render ) )
+import Data.Cuboid.Render         ( Render( render ) )
 import Data.Vector.Sized.X        ( (!!)
                                   , (//)
+                                  )
+import Data.Slice.Lens            ( Slice(..)
+                                  , sliced
+                                  , sliced'
                                   )
 
 import qualified Control.Applicative
 import qualified Data.Foldable
 import qualified Data.Functor
-import qualified Data.Slice.Lens
 import qualified Data.Traversable
 
 import qualified Data.List           as L
@@ -75,7 +78,8 @@ type Point = Rect 1 1
 
 type Line (n :: Nat) = Rect n 1
 
-newtype Rect (r :: Nat)  (c :: Nat) a = Rect
+-- TODO: Extend Rect to Cuboid with z ... and rename r c to y x?
+newtype Rect (r :: Nat) (c :: Nat) a = Rect
   (SV.Vector c (SV.Vector r a))
   deriving (Eq, Foldable, Functor, Generic, Ord, Show, Traversable)
 
@@ -93,7 +97,7 @@ empty :: Rect 0 0 a
 empty = Rect SV.empty
 
 emptyCols :: KnownNat n => Rect 0 n a
-emptyCols = Rect (pure SV.empty)
+emptyCols = Rect $ pure SV.empty
 
 emptyRows :: Rect n 0 a
 emptyRows = Rect SV.empty
@@ -105,10 +109,9 @@ fromList :: forall r c a.
          => [[a]]
          -> Maybe (Rect r c a)
 fromList xs
-  | nSizes == 1 = Just (unsafeFromList xs)
+  | nSizes == 1 = Just $ unsafeFromList xs
   | otherwise   = Nothing
   where
-    nSizes :: Int
     nSizes = length . L.nub . map length $ xs
 
 unsafeFromList :: forall r c a.
@@ -118,9 +121,9 @@ unsafeFromList :: forall r c a.
                => [[a]]
                -> Rect r c a
 unsafeFromList = map SV.unsafeFromList
-  >>> SV.unsafeFromList
-  >>> SV.transpose
-  >>> Rect
+             >>> SV.unsafeFromList
+             >>> SV.transpose
+             >>> Rect
 
 fromSizedVectors :: SV.Vector c (SV.Vector r a) -> Rect r c a
 fromSizedVectors = Rect
@@ -145,21 +148,12 @@ col :: forall r c a.
        Finite c
     -> Lens' (Rect r c a)
              (SV.Vector r a)
-col c = lens get' set'
-  where
-    get' :: Rect r c a
-         -> SV.Vector r a
-    get' (Rect v) = v SV.!! c
-
-    set' :: Rect r c a
-         -> SV.Vector r a
-         -> Rect r c a
-    set' (Rect v) v' = Rect $ SV.update v updates
-      where
-        updates = SV.singleton
-          ( fromIntegral . getFinite $ c
-          , v'
-          )
+col c = lens (\(Rect v) -> v SV.!! c) $ \(Rect v) v' -> Rect
+  . SV.update v
+  . SV.singleton
+  $ ( fromIntegral . getFinite $ c
+    , v'
+    )
 
 row :: forall r c a.
        ( KnownNat r
@@ -178,7 +172,7 @@ sliceC :: forall c' r c x m a p.
        => p x
        -> Rect r c  a
        -> Rect r c' a
-sliceC px (Rect v) = Rect (SV.slice px v)
+sliceC px (Rect v) = Rect $ SV.slice px v
 
 sliceR :: forall r' r c y m a p.
           ( KnownNat r'
@@ -188,7 +182,7 @@ sliceR :: forall r' r c y m a p.
        => p y
        -> Rect r  c a
        -> Rect r' c a
-sliceR py (Rect v) = Rect (SV.map (SV.slice py) v)
+sliceR py (Rect v) = Rect $ SV.map (SV.slice py) v
 
 slice :: forall x y r' c' r c m n a.
          ( KnownNat r'
@@ -202,12 +196,8 @@ slice :: forall x y r' c' r c m n a.
       => (Proxy x, Proxy y)
       -> Lens' (Rect r c a)
                (Rect r' c' a)
-slice (rp, cp) = lens get' set'
+slice (rp, cp) = lens (sliceC cp . sliceR rp) set'
   where
-    get' :: Rect r c a
-         -> Rect r' c' a
-    get' = sliceC cp . sliceR rp
-
     set' :: Rect r c a
          -> Rect r' c' a
          -> Rect r c a
@@ -323,12 +313,12 @@ toLists = unRect
       >>> map SV.toList
       >>> SV.toList
 
--- toTexts :: forall r c a.
---            Renderable a
---         => Rect r c a
---         -> [[Text]]
--- toTexts = toLists
---       >>> map (map render)
+toTexts :: forall r c a.
+           Render a
+        => Rect r c a
+        -> [[Text]]
+toTexts = toLists
+      >>> map (map render)
 
 unRect :: Rect r c a -> SV.Vector c (SV.Vector r a)
 unRect (Rect crv) = crv

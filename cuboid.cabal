@@ -29,6 +29,7 @@ library
   exposed-modules:
       Data.Cuboid
       Data.Cuboid.Prelude
+      Data.Cuboid.Render
       Data.Vector.Sized.X
   other-modules:
       Paths_cuboid
@@ -40,6 +41,7 @@ library
     , lens
     , protolude
     , sliceofpy
+    , text
     , vector
     , vector-sized
   default-language: Haskell2010
@@ -63,6 +65,7 @@ test-suite cuboid-test
     , tasty
     , tasty-discover
     , tasty-hspec
+    , text
     , vector
     , vector-sized
   default-language: Haskell2010

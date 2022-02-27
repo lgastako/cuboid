@@ -62,8 +62,8 @@ spec_Rect =  do
     it "should have length 0" $
       length sq `shouldBe` 0
 
-    -- it "should have toTexts = []" $
-    --   DC.toTexts sq `shouldBe` []
+    it "should have toTexts = []" $
+      DC.toTexts sq `shouldBe` []
 
     it "should have toList = []" $
       DC.toList sq `shouldBe` []
@@ -90,8 +90,8 @@ spec_Rect =  do
     it "should have length 0" $
       length sq `shouldBe` 0
 
-    -- it "should have toTexts = [ [], [], [] ]" $
-    --   DC.toTexts sq `shouldBe` [ [], [], [] ]
+    it "should have toTexts = [ [], [], [] ]" $
+      DC.toTexts sq `shouldBe` [ [], [], [] ]
 
     it "should have toList []" $
       toList sq `shouldBe` []
@@ -115,8 +115,8 @@ spec_Rect =  do
     it "should have length 0" $
       length sq `shouldBe` 0
 
-    -- it "should toTexts []" $
-    --   DC.toTexts sq `shouldBe` []
+    it "should toTexts []" $
+      DC.toTexts sq `shouldBe` []
 
     it "should toList []" $
       DC.toList sq `shouldBe` []

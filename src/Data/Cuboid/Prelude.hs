@@ -1,9 +1,13 @@
-{-# LANGUAGE ExplicitNamespaces #-}
-{-# LANGUAGE NoImplicitPrelude  #-}
+{-# LANGUAGE ExplicitNamespaces   #-}
+{-# LANGUAGE NoImplicitPrelude    #-}
+{-# LANGUAGE ScopedTypeVariables  #-}
 
 module Data.Cuboid.Prelude
   ( module X
+  , (|>)
   , addToEnum
+  , cs
+  , underEnum
   ) where
 
 import Protolude                    as X hiding ( from
@@ -49,18 +53,26 @@ import Data.Finite                  as X        ( Finite
                                                 , getFinite
                                                 , packFinite
                                                 )
+import Data.String                  as X        ( IsString( fromString )
+                                                , String
+                                                )
 import GHC.Natural                  as X        ( Natural )
 import GHC.TypeNats                 as X        ( type (+)
                                                 , natVal'
                                                 )
+import Protolude.Conv                           ( Leniency( Lenient )
+                                                , StringConv( strConv )
+                                                )
 
-addToEnum :: Enum k => Int -> k -> k
-addToEnum n = toEnum . (+n) . fromEnum
+infixr 9 |>
+(|>) :: a -> (a -> b) -> b
+(|>) = (&)
 
--- ( (...)
---                                                 , (|>)
---                                                 , cs
---                                                 , nl
---                                                 , onCrash
---                                                 , orCrash
---                                                 )
+addToEnum :: forall k. Enum k => Int -> k -> k
+addToEnum n = underEnum (+n)
+
+cs :: forall a b. StringConv a b => a -> b
+cs = strConv Lenient
+
+underEnum :: Enum k => (Int -> Int) -> k -> k
+underEnum f = toEnum . f . fromEnum

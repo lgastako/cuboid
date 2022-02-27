@@ -21,6 +21,7 @@ dependencies:
 - lens
 - sliceofpy
 - protolude
+- text
 - vector
 - vector-sized
 
