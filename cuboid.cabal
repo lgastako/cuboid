@@ -28,16 +28,18 @@ source-repository head
 library
   exposed-modules:
       Data.Cuboid
+      Data.Cuboid.CSV
       Data.Cuboid.Prelude
       Data.Cuboid.Render
-      Data.Vector.Sized.X
   other-modules:
       Data.Cuboid.Table
       Data.Cuboid.Widths
+      Data.Vector.Sized.X
   hs-source-dirs:
       src
   build-depends:
       base >=4.7 && <5
+    , cassava
     , finite-typelits
     , lens
     , protolude
@@ -59,6 +61,7 @@ test-suite cuboid-test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
+    , cassava
     , cuboid
     , finite-typelits
     , lens

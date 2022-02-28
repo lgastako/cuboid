@@ -13,7 +13,9 @@ module Data.Cuboid.Prelude
 import Protolude                    as X hiding ( from
                                                 , to
                                                 )
-import Control.Arrow                as X        ( (>>>) )
+import Control.Arrow                as X        ( (>>>)
+                                                , (&&&)
+                                                )
 import Control.Lens                 as X        ( (%~)
                                                 , (*~)
                                                 , (+~)

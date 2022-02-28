@@ -19,9 +19,10 @@ import Test.Tasty.Hspec  ( Spec
                          , it
                          , shouldBe
                          )
-import Data.Cuboid       ( (<+>)
-                         , (</>)
-                         , Line
+import Data.Cuboid       ( -- (<+>)
+                         -- , (</>)
+                         -- , 
+                           Line
                          , Nil
                          , Point
                          , Rect
@@ -91,8 +92,8 @@ spec_Rect =  do
     it "should have length 0" $
       length sq `shouldBe` 0
 
-    it "should have toTexts = [ [], [], [] ]" $
-      DC.toTexts sq `shouldBe` [ [], [], [] ]
+    it "should have toTexts = [[]]" $
+      DC.toTexts sq `shouldBe` [[]]
 
     it "should have toList []" $
       toList sq `shouldBe` []
@@ -100,15 +101,15 @@ spec_Rect =  do
     it "should remain same Rect under Applicative" $
       ((&&) <$> sq <*> sq) `shouldBe` sq
 
-    it "should still be itself after being juxtaposed with itself" $
-      sq <+> sq `shouldBe` sq
+    -- it "should still be itself after being juxtaposed with itself" $
+    --   sq <+> sq `shouldBe` sq
 
-    it "should still be itself after being stacked on top of itself" $
-      (sq </> sq :: Rect 0 6 Bool) `shouldBe` (truth :: Rect 0 6 Bool)
+    -- it "should still be itself after being stacked on top of itself" $
+    --   (sq </> sq :: Rect 0 6 Bool) `shouldBe` (truth :: Rect 0 6 Bool)
 
-    context "transpose" $
-      it "should transpose dimensions " $
-        DC.transpose sq `shouldBe` (truth :: DC.Rect 3 0 Bool)
+    -- context "transpose" $
+    --   it "should transpose dimensions " $
+    --     DC.transpose sq `shouldBe` (truth :: DC.Rect 3 0 Bool)
 
   context "given a (Rect N 0)" $ do
     let sq = truth :: DC.Rect 3 0 Bool
@@ -116,8 +117,8 @@ spec_Rect =  do
     it "should have length 0" $
       length sq `shouldBe` 0
 
-    it "should toTexts []" $
-      DC.toTexts sq `shouldBe` []
+    it "should toTexts [[ [], [], [] ]]" $
+      DC.toTexts sq `shouldBe` [[ [], [], [] ]]
 
     it "should toList []" $
       DC.toList sq `shouldBe` []
@@ -125,11 +126,11 @@ spec_Rect =  do
     it "should remain same Rect under Applicative" $
       ((&&) <$> sq <*> sq) `shouldBe` sq
 
-    it "should still be itself after being juxtaposed with itself" $
-      sq <+> sq `shouldBe` (truth :: DC.Rect 6 0 Bool)
+    -- it "should still be itself after being juxtaposed with itself" $
+    --   sq <+> sq `shouldBe` (truth :: DC.Rect 6 0 Bool)
 
-    it "should still be itself after being stacked on top of itself" $
-      sq </> sq `shouldBe` sq
+    -- it "should still be itself after being stacked on top of itself" $
+    --   sq </> sq `shouldBe` sq
 
     context "transpose" $
       it "should transpose dimensions " $
@@ -138,7 +139,7 @@ spec_Rect =  do
   context "given a (Rect N M) of homogenous values" $ do
     let sq = truth :: DC.Rect 2 2 Bool
 
-    it "should have length 0" $
+    it "should have length 4" $
       length sq `shouldBe` 4
 
     -- it "should toTexts []" $
@@ -161,14 +162,14 @@ spec_Rect =  do
         sq = (DC.fromList xs
               & fromMaybe (panic "RectTest:boom")) :: DC.Rect 2 2 Bool
 
-    it "should have length 0" $
+    it "should have length 4" $
       length sq `shouldBe` 4
 
-    -- it "should toTexts []" $
-    --   DC.toTexts sq `shouldBe` show <<$>> xs
+    it "should toTexts []" $
+      DC.toTexts sq `shouldBe` fmap show <<$>> xs
 
     it "should toList []" $
-      DC.toList sq `shouldBe` (concat . map concat) xs
+      DC.toList sq `shouldBe` concatMap concat xs
 
     it "should remain the same Rect under Applicative" $
       ((&&) <$> sq <*> DC.transpose sq) `shouldBe` sq
@@ -198,8 +199,8 @@ spec_Rect =  do
              ,  [ 'J', 'K' ]
              ]]
         sqx = DC.unsafeFromList xs :: DC.Rect 4 4 Char
-        sqy = DC.unsafeFromList ys :: DC.Rect 4 2 Char
-        sqz = DC.unsafeFromList zs :: DC.Rect 2 4 Char
+        _sqy = DC.unsafeFromList ys :: DC.Rect 4 2 Char
+        _sqz = DC.unsafeFromList zs :: DC.Rect 2 4 Char
         sqq = DC.unsafeFromList qs :: DC.Rect 2 2 Char
 
     context "given their needs, users" $ do
@@ -244,7 +245,7 @@ spec_Rect =  do
         it "should work" $
           toList (sqx ^. DC.row 1) `shouldBe` "EFGH"
 
-    context "slice" $ do
+    context "slice" $
 
       context "viewing" $
         it "should work as expected" $ do
@@ -252,31 +253,31 @@ spec_Rect =  do
               sub = sqx ^. DC.slice (Proxy @0, Proxy @1, Proxy @1)
           sub `shouldBe` sqq
 
-      context "setting" $
-        it "should work as expected"$ do
-          let result :: Rect 4 4 Char
-              result = DC.unsafeFromList
-                [[ "ABCD"
-                ,  "EfgH"
-                ,  "IjkL"
-                ,  "MNOP"
-                ]]
-          (sqx & DC.slice @_ @_ @2 @2
-           (Proxy @0, Proxy @1, Proxy @1) %~ fmap C.toLower)
-            `shouldBe` result
+      -- context "setting" $
+      --   it "should work as expected"$ do
+      --     let result :: Rect 4 4 Char
+      --         result = DC.unsafeFromList
+      --           [[ "ABCD"
+      --           ,  "EfgH"
+      --           ,  "IjkL"
+      --           ,  "MNOP"
+      --           ]]
+      --     (sqx & DC.slice @_ @_ @2 @2
+      --      (Proxy @0, Proxy @1, Proxy @1) %~ fmap C.toLower)
+      --       `shouldBe` result
 
-      context "transposing witin" $
-        it "should work as expected"$ do
-          let result :: Rect 4 4 Char
-              result = DC.unsafeFromList
-                [[ "ABCD"
-                ,  "EFJH"
-                ,  "IGKL"
-                ,  "MNOP"
-                ]]
-          (sqx & DC.slice @_ @_ @2 @2
-            (Proxy @0, Proxy @1, Proxy @1) %~ DC.transpose)
-            `shouldBe` result
+      -- context "transposing within" $
+      --   it "should work as expected"$ do
+      --     let result :: Rect 4 4 Char
+      --         result = DC.unsafeFromList
+      --           [[ "ABCD"
+      --           ,  "EFJH"
+      --           ,  "IGKL"
+      --           ,  "MNOP"
+      --           ]]
+      --     (sqx & DC.slice @_ @_ @2 @2
+      --       (Proxy @0, Proxy @1, Proxy @1) %~ DC.transpose)
+      --       `shouldBe` result
 
 spec_Square :: Spec
 spec_Square =
