@@ -48,4 +48,3 @@ ensureSameRowLengths = \case
     | null rows -> right
     | all (== n) . map length $ rows -> right
     | otherwise -> Left "row size mismatch - all rows must be the same length."
-

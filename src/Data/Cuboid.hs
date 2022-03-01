@@ -90,8 +90,8 @@ newtype Cuboid (z :: Nat) (y :: Nat) (x :: Nat) a = Cuboid
   deriving (Eq, Foldable, Functor, Generic, Ord, Show, Traversable)
 
 type Cube n   = Cuboid n n n
-type Nil      = Cuboid 0 0 0
 type Line     = Rect 1
+type Nil      = Cuboid 0 0 0
 type Point    = Line 1
 type Rect     = Cuboid 1
 type Square n = Rect n n
@@ -351,7 +351,7 @@ transpose :: forall y x a.
 transpose = over (SV.map SV.transpose)
 
 over :: forall z' y' x' a' z y x a.
-         (  SV.Vector z (SV.Vector y (SV.Vector x a))
+         (  SV.Vector z  (SV.Vector y  (SV.Vector x  a))
          -> SV.Vector z' (SV.Vector y' (SV.Vector x' a'))
          )
       -> Cuboid z  y  x  a
